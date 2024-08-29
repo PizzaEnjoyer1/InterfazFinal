@@ -1,4 +1,4 @@
-streamlit
-transformers
-torch
-gtts
+streamlit==1.19.0
+transformers==4.33.0
+torch==2.2.2
+gtts==2.3.2
