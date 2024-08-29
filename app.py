@@ -1,51 +1,33 @@
 import streamlit as st
-from transformers import pipeline
+from chatterbot import ChatBot
+from chatterbot.trainers import ChatterBotCorpusTrainer
 import random
-from gtts import gTTS
-import io
-import base64
 
-# Contextos para cada animal
-animal_contexts = {
-    'Tigre': [
-        "Como un tigre feroz, responde con confianza, autoridad y un toque desafiante.",
-        "Eres un tigre dominante. Usa un tono fuerte y directo en tus respuestas.",
-        "Como tigre valiente, tus respuestas deben ser incisivas y enérgicas."
-    ],
-    'Oso': [
-        "Como un oso sabio, responde con calma, serenidad y reflexión.",
-        "Eres un oso protector. Usa un tono tranquilo y reconfortante.",
-        "Como oso sereno, tus respuestas deben ser pacientes y comprensivas."
-    ],
-    'Pingüino': [
-        "Como un pingüino bromista, responde con humor, sarcasmo y ligereza.",
-        "Eres un pingüino juguetón. Usa un tono alegre y divertido en tus respuestas.",
-        "Como pingüino ingenioso, tus respuestas deben ser ingeniosas y divertidas."
-    ]
+# Crear chatbots con diferentes personalidades
+class ChatBotWithPersonality(ChatBot):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.personality = kwargs.get('personality', 'neutral')
+
+    def get_response(self, *args, **kwargs):
+        response = super().get_response(*args, **kwargs)
+        return f"[{self.personality}] {response.text}"
+
+# Configurar chatbots con personalidades
+chatbots = {
+    'Tigre': ChatBotWithPersonality('Tigre', personality='Feroz'),
+    'Oso': ChatBotWithPersonality('Oso', personality='Calmado'),
+    'Pingüino': ChatBotWithPersonality('Pingüino', personality='Bromista')
 }
 
-# Función para configurar el contexto del chatbot según la personalidad del animal
-def get_chatbot_prompt(animal, user_input):
-    context = random.choice(animal_contexts[animal])
-    prompt = f"{context}\nUsuario: {user_input}\nRespuesta:"
-    return prompt
+# Entrenadores de chatbot
+def train_chatbot(chatbot):
+    trainer = ChatterBotCorpusTrainer(chatbot)
+    trainer.train('chatterbot.corpus.spanish')
 
-# Cargar el modelo de chatbot de Hugging Face
-chatbot = pipeline("text-generation", model="microsoft/DialoGPT-medium")
-
-# Función para generar una respuesta del chatbot
-def generate_response(animal, user_input, chatbot):
-    prompt = get_chatbot_prompt(animal, user_input)
-    response = chatbot(prompt, max_length=100, temperature=0.9, num_return_sequences=1)
-    return response[0]['generated_text'].strip()
-
-# Función para convertir texto a voz
-def text_to_speech(text):
-    tts = gTTS(text=text, lang='es')
-    audio_bytes = io.BytesIO()
-    tts.write_to_fp(audio_bytes)
-    audio_bytes.seek(0)
-    return audio_bytes
+# Entrenar todos los chatbots
+for chatbot in chatbots.values():
+    train_chatbot(chatbot)
 
 # Interfaz de usuario en Streamlit
 st.title('Chat con Animales')
@@ -57,14 +39,9 @@ animal = st.selectbox('Elige un animal para hablar:', ('Tigre', 'Oso', 'Pingüin
 user_input = st.text_input(f'Escribe algo para el {animal}:')
 
 if user_input:
-    # Generar la respuesta personalizada del chatbot
-    response = generate_response(animal, user_input, chatbot)
+    # Generar la respuesta del chatbot
+    chatbot = chatbots[animal]
+    response = chatbot.get_response(user_input)
     
     # Mostrar la respuesta en Streamlit
     st.write("Respuesta del chatbot:", response)
-    
-    # Convertir la respuesta a audio
-    audio_bytes = text_to_speech(response)
-    
-    # Mostrar el reproductor de audio en Streamlit
-    st.audio(audio_bytes, format='audio/mp3')
